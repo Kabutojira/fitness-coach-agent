@@ -1,172 +1,83 @@
 # INSTALL.md
 
-## Install
+## Clone
 
 ```bash
 git clone <repo-url> fitness-coach-agent
 cd fitness-coach-agent
-bash scripts/bootstrap_user_state.sh
-````
+```
 
-## Hermes usage
+## What this repository contains
 
-Use this repository as a Hermes profile/project folder.
+- `AGENTS.md`: primary operating instructions
+- `SOUL.md`: high-level behavioral/personality constraints
+- `templates/`: reusable markdown templates for user state, plans, reviews, ingredients, and recipes
+- `state/`: live private user state at runtime
+- `qa/`: manual regression safeguards
 
-Recommended mapping:
+## Recommended runtime model
 
-* `AGENTS.md` as main instruction file
-* `SOUL.md` as personality file if supported
-* `.agents/skills/` as skill folder
-* `cron/` as scheduled task folder
-* `state/` as private persistent user state
+This repository is markdown-first. The agent should read and update files under `state/` on every real interaction.
 
 Keep `state/` private.
 
-## Generic harness usage
+## Bootstrap a fresh private state directory
 
-Any harness can use this project if it can:
+Create the directories:
 
-* read markdown files
-* edit markdown files
-* run scripts
-* use skill instructions
-* run daily/weekly jobs
+```bash
+mkdir -p state/history state/ingredients state/recipes state/web_research
+```
 
-## Optional integrations
+Copy the templates you want to initialize:
 
-This scaffold is markdown-first.
+```bash
+cp templates/diet_targets_template.md state/diet_targets.md
+cp templates/next_7_days_diet_template.md state/next_7_days_diet.md
+cp templates/next_7_days_training_template.md state/next_7_days_training.md
+cp templates/fridge_list_template.md state/fridge_list.md
+cp templates/to_buy_list_template.md state/to_buy_list.md
+cp templates/todo_list_template.md state/todo_list.md
+cp templates/ingredients_index_template.md state/ingredients_index.md
+cp templates/recipes_index_template.md state/recipes_index.md
+```
 
-Optional future integrations:
+Then create the user-specific files that are not scaffolded yet, such as:
 
-* Alexa list read skill
-* nutrition database search
-* recipe search
-* doctor search
-* smartwatch import
-* scale import
-  EOF
+- `state/USER.md`
+- `state/goals.md`
+- `state/training_targets.md`
+- `state/history/body_stats.md`
+- `state/history/food_log.md`
+- `state/history/training_log.md`
+- `state/history/deviations.md`
+- `state/history/health_notes.md`
 
-cat > templates/USER_template.md <<'EOF'
+Use `templates/ingredient_template.md` and `templates/recipe_template.md` whenever a recurring product, brand, or meal should be saved for reuse.
 
-# User Profile
+## Hermes usage
 
-Status: not_initialized
+Recommended mapping:
 
-## Basic Data
+- `AGENTS.md` as the main instruction file
+- `SOUL.md` as the personality / behavior file if supported
+- `state/` as private persistent user state
+- `qa/` as manual validation guidance
 
-* Name:
-* Age:
-* Sex:
-* Height_cm:
-* Current_weight_kg:
-* Current_weight_date:
-* Waist_cm:
-* Waist_date:
-* Current_city:
-* Travel_context:
+## Generic harness requirements
 
-## Lifestyle
+Any compatible harness should be able to:
 
-* Job_activity_level:
-* Steps_per_day:
-* Sleep_quality:
-* Stress_level:
-* Smoking:
-* Alcohol_pattern:
-* Eating_out_frequency:
-* Cooking_time_available:
-* Budget:
-* Usual_supermarkets:
-* Food_country_context:
+- read markdown files
+- edit markdown files
+- preserve state across sessions
+- run daily/weekly review jobs if desired
+- use web or nutrition lookup tools when precision matters
 
-## Health Context
+## Validation
 
-* Diagnosed_conditions:
-* Medications:
-* Allergies:
-* Intolerances:
-* Injuries:
-* Digestive_issues:
-* Bloodwork_notes:
-* Doctor_constraints:
-* Dietitian_constraints:
+After setup, manually verify the stat-gating behavior with:
 
-## Diet Preferences
+- `qa/manual_stat_gating_checklist.md`
 
-* Liked_foods:
-* Disliked_foods:
-* Preferred_cuisines:
-* Meals_per_day:
-* Breakfast_preference:
-* Batch_cooking:
-* Exact_grams_or_rounded:
-* Hunger_pattern:
-* Trigger_foods:
-* Cheat_foods:
-
-## Training Context
-
-* Training_level:
-* Current_training:
-* Available_equipment:
-* Days_per_week:
-* Session_duration:
-* Preferred_training:
-* Current_lifts:
-* Cardio_level:
-* Injury_limitations:
-* Sports:
-
-## Data Freshness
-
-* Last_weight_check:
-* Last_waist_check:
-* Last_progress_photo:
-* Last_training_update:
-* Last_diet_review:
-* Last_bloodwork:
-  EOF
-
-cat > templates/goals_template.md <<'EOF'
-
-# Goals
-
-## Primary Goal
-
-*
-
-## Secondary Goals
-
-*
-
-## Target Outcome
-
-* Target weight:
-* Target waist:
-* Target performance:
-* Target date:
-* Realistic milestone:
-* Aggressive milestone:
-* Conservative milestone:
-
-## Behavior Goals
-
-* Alcohol:
-* Steps:
-* Sleep:
-* Training:
-* Meal prep:
-* Eating out:
-
-## Current Assessment
-
-*
-
-## Constraints
-
-*
-
-## Success Metrics
-
-*
-
+The repository does not currently include an executable test harness.
