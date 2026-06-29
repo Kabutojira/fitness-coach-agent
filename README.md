@@ -36,6 +36,12 @@ Do not treat chat history as sufficient when state files exist.
 
 Personalized plans, meal plans, shopping lists, calorie/macro targets, and training prescriptions are stat-gated outputs: the agent must check the required user stats in state first and must ask for missing stats instead of guessing.
 
+When the runtime can execute Python, use the deterministic helper scripts in `scripts/` for nutrition math instead of free-form LLM arithmetic:
+
+- `scripts/calculate_diet_targets.py` computes BMR, TDEE, calorie targets, macros, fiber, hydration, and optional per-meal splits from explicit user stats.
+- `scripts/calculate_recipe_nutrition.py` computes total and per-serving recipe nutrition from explicit ingredient quantities and nutrition bases.
+- `tests/test_calculators.py` is the executable regression check for those scripts.
+
 Recurring food memory should also live in `state/`, typically under:
 
 - `state/ingredients/` for product/brand files

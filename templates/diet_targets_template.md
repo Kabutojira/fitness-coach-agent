@@ -1,4 +1,3 @@
-
 # Diet Targets
 
 ## Current Target
@@ -50,41 +49,3 @@
 * If hunger too high:
 * If alcohol deviation:
 * If travel:
-  EOF
-
-cat > templates/training_targets_template.md <<'EOF'
-
-# Training Targets
-
-## Weekly Structure
-
-* Strength_sessions:
-* Cardio_sessions:
-* Mobility_sessions:
-* Steps_target:
-* Rest_days:
-
-## Training Goal
-
-*
-
-## Progression Rule
-
-*
-
-## Current Limitations
-
-*
-
-## Key Exercises
-
-*
-
-## Cardio Targets
-
-*
-
-## Recovery Targets
-
-*
-
