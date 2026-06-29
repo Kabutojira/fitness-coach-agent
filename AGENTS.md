@@ -261,8 +261,12 @@ When giving calories/macros:
   - carbs_g * 4
   - fats_g * 9
   approximately match total calories.
+- Use the deterministic helper scripts in `scripts/` whenever the harness can execute Python instead of relying on free-form LLM arithmetic.
+  - `scripts/calculate_diet_targets.py` computes BMR, TDEE, calorie target, protein, carbs, fat, fiber, hydration, and per-meal splits from explicit user stats.
+  - `scripts/calculate_recipe_nutrition.py` computes total and per-serving calories/macros from explicit ingredient quantities plus nutrition bases.
 - If using a food database, record source in `state/web_research/`.
 - If estimating from memory, label it as estimate.
+- If script inputs are missing, stale, or contradictory, stop and ask for the missing data instead of inventing placeholders.
 
 ## Training planning rules
 

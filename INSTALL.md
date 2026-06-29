@@ -33,6 +33,7 @@ Copy the templates you want to initialize:
 
 ```bash
 cp templates/diet_targets_template.md state/diet_targets.md
+cp templates/training_targets_template.md state/training_targets.md
 cp templates/next_7_days_diet_template.md state/next_7_days_diet.md
 cp templates/next_7_days_training_template.md state/next_7_days_training.md
 cp templates/fridge_list_template.md state/fridge_list.md
@@ -46,7 +47,6 @@ Then create the user-specific files that are not scaffolded yet, such as:
 
 - `state/USER.md`
 - `state/goals.md`
-- `state/training_targets.md`
 - `state/history/body_stats.md`
 - `state/history/food_log.md`
 - `state/history/training_log.md`
@@ -54,6 +54,21 @@ Then create the user-specific files that are not scaffolded yet, such as:
 - `state/history/health_notes.md`
 
 Use `templates/ingredient_template.md` and `templates/recipe_template.md` whenever a recurring product, brand, or meal should be saved for reuse.
+
+Use the helper scripts for deterministic calculations when your harness can run Python:
+
+```bash
+python3 scripts/calculate_diet_targets.py \
+  --age 35 \
+  --sex male \
+  --height-cm 180 \
+  --weight-kg 80 \
+  --activity-multiplier 1.55 \
+  --goal fat_loss \
+  --meals-per-day 4
+
+python3 -m unittest tests/test_calculators.py
+```
 
 ## Hermes usage
 
