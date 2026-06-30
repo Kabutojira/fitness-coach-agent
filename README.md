@@ -52,4 +52,10 @@ If the agent knows a meal is repeated, it should look for saved ingredient/recip
 
 ## QA safeguard
 
-The repository currently has no executable test harness, so stat-gating regressions are checked with the manual checklist at `qa/manual_stat_gating_checklist.md`.
+The repository includes deterministic helper scripts for nutrition math and scheduled review artifact creation. Use them whenever the harness can run Python so state mutations are verifiable instead of being left to free-form model output.
+
+- `scripts/calculate_diet_targets.py`
+- `scripts/calculate_recipe_nutrition.py`
+- `scripts/review_state.py`
+
+The manual checklist at `qa/manual_stat_gating_checklist.md` is still useful for prompt/harness validation, but scheduled daily/weekly reviews should prefer `scripts/review_state.py` so the expected files are actually written and can be verified on disk.

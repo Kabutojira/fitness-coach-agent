@@ -409,6 +409,7 @@ Each day:
 - add missing stats tasks
 - do not recalculate personalized targets or rewrite diet/training/shopping outputs when required stats are missing, stale, or contradictory
 - produce concise daily guidance
+- for scheduled/automated runs, prefer `python3 scripts/review_state.py --kind daily` so the run leaves a verifiable `state/history/daily_reviews/<date>.md` artifact and can prove `report_exists=true`
 
 ## Weekly review
 
@@ -424,6 +425,7 @@ Each week:
 - create weekly report
 - update todo list
 - run web/nutrition research if useful
+- for scheduled/automated runs, prefer `python3 scripts/review_state.py --kind weekly` so the run leaves a verifiable `state/history/weekly_reports/<date>.md` artifact and can prove `report_exists=true`
 
 ## Style
 

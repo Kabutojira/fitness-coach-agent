@@ -1,6 +1,6 @@
 # Calculator Scripts
 
-These helper scripts make the nutrition math deterministic.
+These helper scripts make the nutrition math and scheduled review state writes deterministic.
 
 ## `calculate_diet_targets.py`
 
@@ -86,6 +86,27 @@ Supported nutrition basis types:
 - `per_100g`
 - `per_unit`
 - `per_package`
+
+## `review_state.py`
+
+Creates verifiable daily or weekly review artifacts under `state/history/`, bootstraps the expected `state/` scaffold when files are missing, and updates `state/todo_list.md` with deterministic blocker follow-ups.
+
+Examples:
+
+```bash
+python3 scripts/review_state.py --kind daily
+python3 scripts/review_state.py --kind weekly
+python3 scripts/review_state.py --kind daily --date 2026-06-30 --state-root /path/to/state
+```
+
+The script prints JSON including:
+- `report_path`
+- `report_exists`
+- `changed_files`
+- `blockers`
+- `todo_updates`
+
+Use it for scheduled reviews instead of trusting free-form model text to have written files.
 
 ## Regression test
 

@@ -100,6 +100,126 @@ class CalculatorScriptsTest(unittest.TestCase):
         self.assertEqual(data["per_serving"]["protein_g"], 21.76)
         self.assertEqual(data["ingredients"][0]["basis_type"], "per_100g")
 
+    def test_review_state_daily_bootstraps_and_writes_report(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_root = Path(tmpdir) / "state"
+            state_root.mkdir(parents=True, exist_ok=True)
+            (state_root / "USER.md").write_text(
+                "# User Profile\n\nStatus: not_initialized\n",
+                encoding="utf-8",
+            )
+
+            data = self.run_script(
+                "scripts/review_state.py",
+                "--kind", "daily",
+                "--date", "2026-06-30",
+                "--state-root", str(state_root),
+            )
+
+            report_path = Path(data["report_path"])
+            self.assertTrue(report_path.exists())
+            self.assertTrue(data["report_exists"])
+            self.assertIn("state/history/daily_reviews/2026-06-30.md", data["changed_files"])
+            self.assertIn("state/todo_list.md", data["changed_files"])
+            self.assertTrue(any("not_initialized" in item for item in data["blockers"]))
+            todo_text = (state_root / "todo_list.md").read_text(encoding="utf-8")
+            self.assertIn("Complete first-start intake.", todo_text)
+            report_text = report_path.read_text(encoding="utf-8")
+            self.assertIn("Do not recalculate personalized diet/training/shopping targets", report_text)
+
+    def test_review_state_weekly_writes_report(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_root = Path(tmpdir) / "state"
+            state_root.mkdir(parents=True, exist_ok=True)
+            (state_root / "USER.md").write_text(
+                "# User Profile\n\nStatus: ready\n",
+                encoding="utf-8",
+            )
+            (state_root / "goals.md").write_text(
+                "# Goals\n\n* Primary goal: fat loss\n",
+                encoding="utf-8",
+            )
+            history = state_root / "history"
+            history.mkdir(parents=True, exist_ok=True)
+            (history / "body_stats.md").write_text(
+                "# Body Stats\n\n* Weight: 80 kg on 2026-06-30\n* Waist: 90 cm\n",
+                encoding="utf-8",
+            )
+            for name, content in {
+                "food_log.md": "# Food Log\n\n* 2026-06-29: logged meals\n",
+                "training_log.md": "# Training Log\n\n* 2026-06-29: squat 3x5 @ RPE 8\n",
+                "deviations.md": "# Deviations\n\n* 2026-06-28: dinner out\n",
+                "health_notes.md": "# Health Notes\n\n* No known intolerances\n",
+            }.items():
+                (history / name).write_text(content, encoding="utf-8")
+            (state_root / "fridge_list.md").write_text("# Fridge List\n\n* Eggs\n", encoding="utf-8")
+            (state_root / "todo_list.md").write_text("# Todo List\n\n## Active\n\n", encoding="utf-8")
+
+            data = self.run_script(
+                "scripts/review_state.py",
+                "--kind", "weekly",
+                "--date", "2026-06-30",
+                "--state-root", str(state_root),
+            )
+
+            report_path = Path(data["report_path"])
+            self.assertTrue(report_path.exists())
+            self.assertEqual(report_path.name, "2026-06-30.md")
+            self.assertIn("state/history/weekly_reports/2026-06-30.md", data["changed_files"])
+            report_text = report_path.read_text(encoding="utf-8")
+            self.assertIn("The scheduled review now writes a real report artifact", report_text)
+
+    def test_review_state_honors_custom_state_root_name(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_root = Path(tmpdir) / "private_fitness_state"
+            history = state_root / "history"
+            history.mkdir(parents=True, exist_ok=True)
+            (state_root / "USER.md").write_text("# User Profile\n\nStatus: ready\n", encoding="utf-8")
+            (state_root / "goals.md").write_text("# Goals\n\n* Primary goal: maintenance\n", encoding="utf-8")
+            (history / "body_stats.md").write_text(
+                "# Body Stats\n\n* Weight: 75 kg on 2026-06-30\n* Waist: 84 cm\n",
+                encoding="utf-8",
+            )
+            for name, content in {
+                "food_log.md": "# Food Log\n\n* 2026-06-29: logged meals\n",
+                "training_log.md": "# Training Log\n\n* 2026-06-29: bench 3x5\n",
+                "deviations.md": "# Deviations\n\n* none\n",
+                "health_notes.md": "# Health Notes\n\n* none\n",
+            }.items():
+                (history / name).write_text(content, encoding="utf-8")
+            (state_root / "fridge_list.md").write_text("# Fridge List\n\n* Yogurt\n", encoding="utf-8")
+            (state_root / "todo_list.md").write_text("# Todo List\n\n## Active\n\n", encoding="utf-8")
+
+            data = self.run_script(
+                "scripts/review_state.py",
+                "--kind", "daily",
+                "--date", "2026-06-30",
+                "--state-root", str(state_root),
+            )
+
+            self.assertFalse(any("missing state/goals.md" in item for item in data["blockers"]))
+            self.assertTrue(Path(data["report_path"]).exists())
+
+    def test_review_state_is_idempotent_for_same_day(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            state_root = Path(tmpdir) / "state"
+            first = self.run_script(
+                "scripts/review_state.py",
+                "--kind", "daily",
+                "--date", "2026-06-30",
+                "--state-root", str(state_root),
+            )
+            second = self.run_script(
+                "scripts/review_state.py",
+                "--kind", "daily",
+                "--date", "2026-06-30",
+                "--state-root", str(state_root),
+            )
+
+            self.assertTrue(first["changed_files"])
+            self.assertEqual(second["changed_files"], [])
+            self.assertTrue(Path(second["report_path"]).exists())
+
 
 if __name__ == "__main__":
     unittest.main()
