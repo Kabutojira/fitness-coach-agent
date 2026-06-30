@@ -1,55 +1,79 @@
 # Ultimate Fitness Coach Agent
 
-A single-user, markdown-first fitness coach agent for Hermes or any compatible agent harness.
-
-## Purpose
-
-The agent acts as a stateful personal fitness coach with dietologist-level nutrition behavior, training planning, training progress tracking, fridge/shopping awareness, recipe support, photo-based food/fridge analysis, and adaptive weekly planning.
-
-## Core behavior
-
-- Ask user goals first.
-- Collect enough personal, health, diet, lifestyle, and training data before creating the first plan.
-- Before any later personalized diet, shopping, training, macro, calorie, or body-composition output, re-check the required stats from `state/` instead of assuming prior context is still sufficient.
-- If required stats are missing, stale, or contradictory, do not generate the personalized plan anyway; tell the user what is missing and ask for the update.
-- Maintain state in markdown files.
-- Persist recurring ingredients/products and recurring recipes in markdown files so repeated meals can reuse known stats instead of being re-estimated each time.
-- Generate diet and training plans.
-- Update plans after real-life deviations.
-- Use web/nutrition databases when precision matters.
-- Search recipes and nutrition references online when useful.
-- Track training progress.
-- Keep fridge, shopping list, todo list, and reports current.
-- Use medical-style triage when symptoms or injury questions appear.
-- Escalate to professional care when the agent judges risk is material.
-
-## Runtime targets
-
-Primary: Hermes Agent  
-Secondary: any harness able to read markdown context files, use skills, run scripts, and execute scheduled tasks.
+A single-user fitness coach agent with deterministic CSV state.
 
 ## Source of truth
 
-The source of truth is `state/`.
+`state/*.csv` is the only source of truth.
 
-Do not treat chat history as sufficient when state files exist.
+Rules:
+- Do not treat chat history or legacy markdown files as authoritative when CSV state exists.
+- Do not edit CSV files manually.
+- All reads must go through getters or `scripts/get_state.py`.
+- All writes must go through setters or `scripts/set_state.py`.
+- Before any personalized diet plan, training plan, shopping list, target calculation, or adjustment, run `scripts/get_context.py` with the matching `--purpose`.
+- If `get_context` reports blocked readiness, ask only for the missing fields and stop.
 
-Personalized plans, meal plans, shopping lists, calorie/macro targets, and training prescriptions are stat-gated outputs: the agent must check the required user stats in state first and must ask for missing stats instead of guessing.
+Legacy markdown files may still be present in `state/`, but they are obsolete and non-authoritative.
 
-When the runtime can execute Python, use the deterministic helper scripts in `scripts/` for nutrition math instead of free-form LLM arithmetic:
+## State layout
 
-- `scripts/calculate_diet_targets.py` computes BMR, TDEE, calorie targets, macros, fiber, hydration, and optional per-meal splits from explicit user stats.
-- `scripts/calculate_recipe_nutrition.py` computes total and per-serving recipe nutrition from explicit ingredient quantities and nutrition bases.
-- `tests/test_calculators.py` is the executable regression check for those scripts.
+The CSV files live directly under `state/`:
 
-Recurring food memory should also live in `state/`, typically under:
+- `user_profile.csv`
+- `goals.csv`
+- `targets.csv`
+- `body_stats.csv`
+- `diet_history.csv`
+- `training_history.csv`
+- `diet_plan.csv`
+- `training_plan.csv`
+- `ingredients.csv`
+- `recipes.csv`
+- `recipe_ingredients.csv`
+- `dietary_restrictions.csv`
+- `health_notes.csv`
+- `deviations.csv`
+- `fridge_items.csv`
+- `shopping_list.csv`
+- `web_research.csv`
 
-- `state/ingredients/` for product/brand files
-- `state/recipes/` for recurring meals and batch-cooked dishes
-- optional `state/ingredients_index.md` and `state/recipes_index.md` catalogs
+Every CSV includes deterministic metadata columns:
 
-If the agent knows a meal is repeated, it should look for saved ingredient/recipe files before estimating from scratch. Brand-specific data should be saved with source and confidence notes.
+`id,created_at,updated_at,source,confidence,status,llm_notes`
 
-## QA safeguard
+## Deterministic helpers
 
-The repository currently has no executable test harness, so stat-gating regressions are checked with the manual checklist at `qa/manual_stat_gating_checklist.md`.
+- `scripts/get_state.py` reads CSV state in json, markdown, or csv format.
+- `scripts/set_state.py` writes validated rows and daily upserts.
+- `scripts/get_context.py` renders markdown context and readiness checks.
+- `scripts/calculate_diet_targets.py` supports explicit CLI inputs and `--from-state` / `--write-state`.
+- `scripts/calculate_recipe_nutrition.py` supports explicit JSON input and `--from-state` / `--write-state`.
+
+## Projection behavior
+
+`get_context` ensures the next 7 days of diet and training projection exist.
+
+Diet projection:
+- fills only missing future rows
+- preserves existing future plan rows
+- smooths past calorie over/undershoot across the next week
+- caps daily compensation at 10% of daily calories
+- preserves protein and avoids negative carbs/fats
+
+Training projection:
+- fills only missing future rows
+- reschedules missed sessions conservatively
+- avoids catch-up load spikes when pain or recovery concerns exist
+
+## Testing
+
+Run:
+
+```bash
+python3 -m pytest -q
+```
+
+Manual QA checklist:
+
+- `qa/manual_csv_state_checklist.md`

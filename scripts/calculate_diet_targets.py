@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compute calorie and macro targets from explicit user stats.
+"""Compute calorie and macro targets from explicit user stats or CSV state.
 
 The script is intentionally deterministic and refuses to guess missing inputs.
 It prints JSON by default so an agent can consume the result directly.
@@ -9,8 +9,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
 from typing import Literal
+
+from fitness_state.getters import get_active_goals, get_latest_body_stats, get_user_profile
+from fitness_state.setters import add_target
 
 Sex = Literal["male", "female"]
 Goal = Literal["fat_loss", "recomposition", "maintenance", "muscle_gain"]
@@ -56,16 +62,15 @@ def bounded_percent(value: str) -> float:
     return parsed
 
 
-def load_inputs() -> Inputs:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--age", required=True, type=int)
-    parser.add_argument("--sex", required=True, choices=["male", "female"])
-    parser.add_argument("--height-cm", required=True, type=positive_number)
-    parser.add_argument("--weight-kg", required=True, type=positive_number)
-    parser.add_argument("--activity-multiplier", required=True, type=positive_number)
+    parser.add_argument("--age", type=int)
+    parser.add_argument("--sex", choices=["male", "female"])
+    parser.add_argument("--height-cm", type=positive_number)
+    parser.add_argument("--weight-kg", type=positive_number)
+    parser.add_argument("--activity-multiplier", type=positive_number)
     parser.add_argument(
         "--goal",
-        required=True,
         choices=list(GOAL_DEFAULTS),
         help="fat_loss, recomposition, maintenance, muscle_gain",
     )
@@ -81,8 +86,98 @@ def load_inputs() -> Inputs:
     parser.add_argument("--fiber-g-per-1000-kcal", type=positive_number, default=14.0)
     parser.add_argument("--water-ml-per-kg", type=positive_number, default=35.0)
     parser.add_argument("--meals-per-day", type=int)
-    args = parser.parse_args()
+    parser.add_argument("--from-state", action="store_true")
+    parser.add_argument("--write-state", action="store_true")
+    parser.add_argument("--state-dir", default=str(Path(__file__).resolve().parents[1] / "state"))
+    return parser
 
+
+def _require(value, message: str):
+    if value in {None, ""}:
+        raise SystemExit(message)
+    return value
+
+
+def _extract_note_number(text: str | None, key: str) -> float | None:
+    if not text:
+        return None
+    match = re.search(rf"{re.escape(key)}\s*=\s*([0-9]+(?:\.[0-9]+)?)", text)
+    return float(match.group(1)) if match else None
+
+
+def _goal_from_state(state_dir: str) -> Goal:
+    active_goals = get_active_goals(state_dir=state_dir)
+    if not active_goals:
+        raise SystemExit("missing required state input: active goal")
+    goal_type = active_goals[-1].get("goal_type") or ""
+    if goal_type not in GOAL_DEFAULTS:
+        raise SystemExit(f"unsupported goal_type for calculator: {goal_type}")
+    return goal_type  # type: ignore[return-value]
+
+
+def inputs_from_state(args: argparse.Namespace) -> Inputs:
+    profile = get_user_profile(state_dir=args.state_dir)
+    stats = get_latest_body_stats(state_dir=args.state_dir)
+    if not profile:
+        raise SystemExit("missing required state input: user_profile")
+    if not stats:
+        raise SystemExit("missing required state input: latest body_stats")
+
+    notes = str(profile.get("llm_notes", ""))
+    activity_multiplier = _extract_note_number(notes, "activity_multiplier")
+    meals_per_day = _extract_note_number(notes, "meals_per_day")
+    body_fat_percent = stats.get("body_fat_percent") or args.body_fat_percent
+
+    age_value = _require(profile.get("age"), "missing required state input: age")
+    sex_value = _require(profile.get("sex"), "missing required state input: sex")
+    height_value = _require(profile.get("height_cm"), "missing required state input: height_cm")
+    weight_value = _require(stats.get("weight_kg"), "missing required state input: weight_kg")
+
+    age = int(float(str(age_value)))
+    sex_text = str(sex_value)
+    if sex_text == "male":
+        sex: Sex = "male"
+    elif sex_text == "female":
+        sex = "female"
+    else:
+        raise SystemExit(f"unsupported sex in state: {sex_text}")
+    height_cm = float(str(height_value))
+    weight_kg = float(str(weight_value))
+    goal = _goal_from_state(args.state_dir)
+    if activity_multiplier is None:
+        raise SystemExit("missing required state input: activity_multiplier in user_profile.llm_notes")
+
+    defaults = GOAL_DEFAULTS[goal]
+    return Inputs(
+        age=age,
+        sex=sex,
+        height_cm=height_cm,
+        weight_kg=weight_kg,
+        activity_multiplier=activity_multiplier,
+        goal=goal,
+        formula=args.formula,
+        body_fat_percent=float(body_fat_percent) if body_fat_percent not in {None, ""} else None,
+        calorie_adjustment_percent=(
+            args.calorie_adjustment_percent
+            if args.calorie_adjustment_percent is not None
+            else defaults["calorie_adjustment_percent"]
+        ),
+        protein_g_per_kg=args.protein_g_per_kg or defaults["protein_g_per_kg"],
+        fat_g_per_kg=args.fat_g_per_kg or defaults["fat_g_per_kg"],
+        fiber_g_per_1000_kcal=args.fiber_g_per_1000_kcal,
+        water_ml_per_kg=args.water_ml_per_kg,
+        meals_per_day=int(meals_per_day) if meals_per_day is not None else None,
+    )
+
+
+def load_inputs(args: argparse.Namespace) -> Inputs:
+    if args.from_state:
+        return inputs_from_state(args)
+
+    required = ["age", "sex", "height_cm", "weight_kg", "activity_multiplier", "goal"]
+    missing = [name for name in required if getattr(args, name) in {None, ""}]
+    if missing:
+        raise SystemExit(f"missing required arguments: {', '.join('--' + name.replace('_', '-') for name in missing)}")
     if args.age <= 0:
         raise SystemExit("--age must be > 0")
     if args.meals_per_day is not None and args.meals_per_day <= 0:
@@ -212,5 +307,32 @@ def compute(inputs: Inputs) -> dict:
     }
 
 
+def maybe_write_state(result: dict, *, state_dir: str) -> dict[str, str] | None:
+    return add_target(
+        state_dir=state_dir,
+        source="calculation",
+        confidence="high",
+        target_type="diet",
+        effective_from=date.today().isoformat(),
+        calories_kcal=result["targets"]["calories_kcal"],
+        protein_g=result["targets"]["protein_g"],
+        carbs_g=result["targets"]["carbs_g"],
+        fat_g=result["targets"]["fat_g"],
+        fiber_g=result["targets"]["fiber_g"],
+        water_l=result["targets"]["water_l"],
+        calculation_method=f"calculate_diet_targets:{result['calculation_notes']['formula']}",
+        llm_notes="Generated by calculate_diet_targets.py --write-state",
+    )
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    inputs = load_inputs(args)
+    result = compute(inputs)
+    if args.write_state:
+        result["state_write"] = maybe_write_state(result, state_dir=args.state_dir)
+    print(json.dumps(result, indent=2, sort_keys=True))
+
+
 if __name__ == "__main__":
-    print(json.dumps(compute(load_inputs()), indent=2, sort_keys=True))
+    main()
