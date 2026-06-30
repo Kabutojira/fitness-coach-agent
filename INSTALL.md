@@ -55,7 +55,7 @@ Then create the user-specific files that are not scaffolded yet, such as:
 
 Use `templates/ingredient_template.md` and `templates/recipe_template.md` whenever a recurring product, brand, or meal should be saved for reuse.
 
-Use the helper scripts for deterministic calculations when your harness can run Python:
+Use the helper scripts for deterministic calculations and deterministic scheduled review writes when your harness can run Python:
 
 ```bash
 python3 scripts/calculate_diet_targets.py \
@@ -67,8 +67,13 @@ python3 scripts/calculate_diet_targets.py \
   --goal fat_loss \
   --meals-per-day 4
 
+python3 scripts/review_state.py --kind daily
+python3 scripts/review_state.py --kind weekly
+
 python3 -m unittest tests/test_calculators.py
 ```
+
+For scheduled daily/weekly reviews, prefer running `scripts/review_state.py` from cron (or from the agent via `terminal`) and verify the JSON field `report_exists` before claiming success. That closes the failure mode where a free-form model response says it wrote `state/history/...` artifacts that never appeared on disk.
 
 ## Hermes usage
 
